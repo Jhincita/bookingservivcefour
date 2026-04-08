@@ -19,7 +19,9 @@
     "react": "19.2.3",
     "react-day-picker": "^9.13.0",
     "react-dom": "19.2.3",
-    "resend": "^6.8.0",
+    "resend": "^6.10.0",
+    "transbank-sdk": "^6.1.1",
+    "vercel": "^50.42.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

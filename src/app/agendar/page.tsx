@@ -1,26 +1,20 @@
-"use client"; // this file runs in the browser, not on the server
-// explanation :  next js app router defaults to SERVER COMPONENTS BUT
-// this directive opt-in marks file as CLIENT COMPONENTS, which enables:
-//   : react hooks, event listeners, client-side state - -> required for interactive UI
+"use client";
 
-import {useEffect, useState} from "react"; // lets the component _remember_smt .
+import { useEffect, useState } from "react";
 import { DayPicker } from "react-day-picker";
-// industry explanation : this is a local component state which is used to trtack input during multi step booking
-import { es } from "date-fns/locale"; // spanish locale
-import { getAvailableSlots} from "@/actions/slots";
-import { bookAppointment } from "@/actions/booking";
-import "react-day-picker/dist/style.css"; // styles
+import { es } from "date-fns/locale";
+import { getAvailableSlots } from "@/actions/slots";
+import { createPendingAppointment } from "@/actions/createPendingAppointment"; // ✅ new import
+import "react-day-picker/dist/style.css";
 import Link from "next/link";
 
 type Slot = {
     id: string;
     startTime: string;
     endTime: string;
-}
+};
 
-// rut validation helper
-function formatRut(rut: string):string {
-    // trims shit
+function formatRut(rut: string): string {
     const clean = rut.replace(/[.\s]/g, "").toUpperCase();
     return clean;
 }
@@ -28,33 +22,27 @@ function formatRut(rut: string):string {
 function validateRut(rut: string): boolean {
     const clean = formatRut(rut);
     if (!/^\d{7,8}-[\dK]$/.test(clean)) return false;
-
     const [numbers, dv] = clean.split("-");
     let sum = 0;
     let multiplier = 2;
-
-    for (let i = numbers.length -1; i>=0; i--) {
+    for (let i = numbers.length - 1; i >= 0; i--) {
         sum += parseInt(numbers[i]) * multiplier;
-        multiplier = multiplier === 7 ? 2 : multiplier +1;
+        multiplier = multiplier === 7 ? 2 : multiplier + 1;
     }
-
     const expectedDv = 11 - (sum % 11);
     const dvChar = expectedDv === 11 ? "0" : expectedDv === 10 ? "K" : expectedDv.toString();
-
     return dv === dvChar;
 }
 
-export default function AgendarPage(){
-    const [selectedDate, setSelectedDate] = useState<Date | undefined>(); // the state thats remembereed with usestate
-    // starts as undefined by default
+export default function AgendarPage() {
+    const [selectedDate, setSelectedDate] = useState<Date | undefined>();
     const [slots, setSlots] = useState<Slot[]>([]);
     const [selectedSlot, setSelectedSlot] = useState<Slot | undefined>();
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | undefined>();
-    const [success, setSuccess] = useState(false);
+    const [bookingSubmitted, setBookingSubmitted] = useState(false); // ✅ renamed from "success"
 
-    // Form fields
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
@@ -62,7 +50,6 @@ export default function AgendarPage(){
 
     useEffect(() => {
         if (!selectedDate) return;
-
         const fetchSlots = async () => {
             setLoading(true);
             setSelectedSlot(undefined);
@@ -99,57 +86,62 @@ export default function AgendarPage(){
             return;
         }
 
+        // Local variables to satisfy TypeScript
+        const date = selectedDate;
+        const slot = selectedSlot;
+
         setSubmitting(true);
-
-        const result = await bookAppointment({
-            selectedDate,
-            startTime: selectedSlot.startTime,
-            slotId: selectedSlot.id,
-            patientName: name.trim(),
-            patientEmail: email.trim(),
-            patientPhone: phone.trim(),
-            patientRut: formatRut(rut),
-        });
-
-        setSubmitting(false);
-
-        if (result.success) {
-            setSuccess(true);
-        } else {
-            setError(result.error);
+        try {
+            const result = await createPendingAppointment({
+                slotId: slot.id,
+                selectedDate: date,
+                patientName: name.trim(),
+                patientEmail: email.trim(),
+                patientPhone: phone.trim(),
+                patientRut: formatRut(rut),
+            });
+            if (result.success) {
+                setBookingSubmitted(true);
+            } else {
+                setError(result.error || "Error al crear la reserva");
+            }
+        } catch (err: unknown) {  // ✅ No more 'any'
+            const errorMessage = err instanceof Error ? err.message : "Error desconocido";
+            setError(errorMessage);
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    if (success) {
+    // ✅ Updated success screen
+    if (bookingSubmitted) {
         return (
             <main>
                 <div className="card animate-in text-center">
-                    <h1>¡Cita Agendada!</h1>
+                    <h1>¡Solicitud enviada!</h1>
                     <p className="mb-2">
-                        {selectedDate?.toLocaleDateString("es-CL")} a las {selectedSlot?.startTime}
+                        Hemos enviado un correo a <strong>{email}</strong> con un enlace de pago.
                     </p>
-                    <p>
-                        Te enviaremos un email de confirmación.
-                    </p>
+                    <p>Una vez realizado el pago, tu cita quedará confirmada automáticamente.</p>
+                    <Link href="/" className="btn-primary mt-4">
+                        Volver al inicio
+                    </Link>
                 </div>
             </main>
         );
     }
 
-    // The DayPicker only collects a date.
-    // Server actions decide what that date means.
+    // Rest of the JSX unchanged
     return (
         <main>
             <Link href="/" className="back-btn" aria-label="Volver">
                 <svg className="back-chevron" width="16" height="16" viewBox="0 0 24 24">
-                    <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                    <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
                 </svg>
             </Link>
             <div className="card animate-in">
-
                 <h1>Agendar Hora</h1>
                 <p className="mb-6">Selecciona una fecha y horario disponible</p>
-
 
                 <div className="flex gap-8 flex-wrap">
                     <DayPicker
@@ -160,14 +152,11 @@ export default function AgendarPage(){
                         disabled={{ before: new Date() }}
                     />
 
-
-
                     {selectedDate && (
                         <div className="flex-1 min-w-[280px] animate-in">
                             <h2>
                                 Horarios disponibles para: {selectedDate.toLocaleDateString("es-CL")}
                             </h2>
-
                             {loading ? (
                                 <p>Cargando...</p>
                             ) : slots.length === 0 ? (
@@ -179,9 +168,7 @@ export default function AgendarPage(){
                                             key={slot.id}
                                             onClick={() => setSelectedSlot(slot)}
                                             className={`slot-btn ${
-                                                selectedSlot?.id === slot.id
-                                                    ? "selected"
-                                                    : ""
+                                                selectedSlot?.id === slot.id ? "selected" : ""
                                             }`}
                                         >
                                             {slot.startTime}
@@ -195,9 +182,9 @@ export default function AgendarPage(){
                     {selectedSlot && (
                         <div className="flex-1 min-w-[280px] animate-in">
                             <h2>
-                                Confirmar cita: {selectedDate?.toLocaleDateString("es-CL")} a las {selectedSlot.startTime}
+                                Confirmar cita: {selectedDate?.toLocaleDateString("es-CL")} a las{" "}
+                                {selectedSlot.startTime}
                             </h2>
-
                             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                                 <input
                                     type="text"
@@ -223,26 +210,15 @@ export default function AgendarPage(){
                                     value={rut}
                                     onChange={(e) => setRut(e.target.value)}
                                 />
-
-                                {error && (
-                                    <p className="text-red-500 text-sm">{error}</p>
-                                )}
-
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="btn-primary"
-                                >
-                                    {submitting ? "Agendando..." : "Confirmar Cita"}
+                                {error && <p className="text-red-500 text-sm">{error}</p>}
+                                <button type="submit" disabled={submitting} className="btn-primary">
+                                    {submitting ? "Procesando..." : "Confirmar Cita"}
                                 </button>
                             </form>
                         </div>
                     )}
                 </div>
             </div>
-
-
         </main>
-
     );
 }
