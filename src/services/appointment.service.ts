@@ -28,7 +28,6 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
     // This way if calendar fails, we don't have an orphan appointment
     const calendarResult = await createCalendarEvent({
         patientName: input.patientName,
-        patientEmail: input.patientEmail,
         dateTime: appointmentDate,
         durationMinutes: 45, // Your appointment duration
     });

@@ -1,8 +1,15 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { buildDateTimeFromSlot } from '@/services/appointment.utils';
-import { sendPaymentEmail } from '@/lib/email'; // or from '@/lib/email/sendPaymentEmail'
+import { sendPaymentEmail } from '@/lib/email';
+
+// Helper function (previously imported from deleted file)
+function buildDateTimeFromSlot(selectedDate: Date, startTime: string): Date {
+    const [hour, minute] = startTime.split(':').map(Number);
+    const dateTime = new Date(selectedDate);
+    dateTime.setHours(hour, minute, 0, 0);
+    return dateTime;
+}
 
 export async function createPendingAppointment(input: {
     slotId: string;
@@ -56,8 +63,10 @@ export async function createPendingAppointment(input: {
         });
 
         return { success: true, appointmentId: appointment.id };
-    } catch (error: any) {
+    } catch (error: unknown) {
+        // ✅ No 'any' – use unknown and narrow
+        const errorMessage = error instanceof Error ? error.message : 'Error interno';
         console.error('Create pending appointment error:', error);
-        return { success: false, error: error.message || 'Error interno' };
+        return { success: false, error: errorMessage };
     }
 }
